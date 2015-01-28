@@ -77,6 +77,7 @@ def parse_docs(dir, index, doc_type):
                     line = f.readline()
 
 def load_docs(client, dir, index, doc_type):
+    docs_count = 0
     for ok, result in streaming_bulk(
         client,
         parse_docs(dir, index, doc_type)
@@ -86,7 +87,9 @@ def load_docs(client, dir, index, doc_type):
         if not ok:
             print('Failed to %s document %s: %r' % (action, doc_id, result))
         else:
+            docs_count += 1
             print(doc_id)
+    print("docs_count: {}".format(docs_count))
 
 
 if __name__ == '__main__':
