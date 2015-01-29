@@ -1,0 +1,25 @@
+Okapi TF
+Average precision:	0.1395
+Precision at 10 docs:	0.3080
+Precision at 30 docs:	0.2627
+
+TF-IDF
+Average precision:	0.1991
+Precision at 10 docs:	0.3600
+Precision at 30 docs:	0.3107
+
+Okapi BM25
+Average precision:	0.1903
+Precision at 10 docs:	0.3600
+Precision at 30 docs:	0.2933
+
+Unigram LM with Laplace smoothing
+Average precision:	0.1380
+Precision at 10 docs:	0.3440
+Precision at 30 docs:	0.2720
+
+Unigram LM with Jelinek-Mercer smoothing
+Average precision:	0.1297
+Precision at 10 docs:	0.2080
+Precision at 30 docs:	0.1933
+
