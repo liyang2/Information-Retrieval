@@ -73,7 +73,7 @@ def tf_df(jsonObj):
 # [ (id, (tf, df), doc_length, ttf) ]
 def docs_postings(es, index, term):
     global docs_info, total_docs, doc_lens
-    print("term: " + term)
+    print(term+", ", end="")
     if docs_info.has_key(term):
         return docs_info[term]
     else:
@@ -90,11 +90,11 @@ def docs_postings(es, index, term):
         ttf = 0
         for hit in results['hits']['hits']:
             ttf += tf_df(hit['_explanation'])[1]
-        docFreq = -1
+        docFreq = 0
         docs = {}
         for hit in results['hits']['hits']: # relevant docs
             docs[hit['_id']] = ( hit['_id'], tf_df(hit['_explanation']), doc_lens[hit['_id']], ttf )
-            if docFreq == -1:
+            if docFreq == 0:
                 docFreq = tf_df(hit['_explanation'])[1]
         for key, value in doc_lens.items(): # irrelevant docs
             if not docs.has_key(key):
@@ -143,22 +143,23 @@ def tf_idf(tf, doc_len, df):
     global total_docs
     return okapi_tf(tf, doc_len) * math.log(total_docs / df)
 
-def okapi_bm25(tf, doc_len, df, k1, k2, b):
+def okapi_bm25(tf, tf_q, doc_len, df, k1, k2, b):
     global total_docs, avg_length
     return math.log((total_docs + 0.5) / (df + 0.5)) * \
            ((tf + k1 * tf) / (tf + k1* ((1-b) + b * (doc_len / avg_length)))) * \
-           ((tf + k2 * tf) / (tf + k2))
+           ((tf_q + k2 * tf_q) / (tf_q + k2))
 
 def unigram_lm_laplace(tf, doc_len):
     global voc_size
-    return (tf + 1) / (doc_len + voc_size)
+    return math.log((tf + 1) / (doc_len + voc_size))
 
 def unigram_lm_JM(tf, doc_len, ttf, lambd):
     if doc_len == 0:
-        return 0
+        doc_len = 1
+        tf = 0
     global total_docs, avg_length
     val = lambd * tf / doc_len + (1-lambd) * ttf / (total_docs * avg_length);
-    return val
+    return math.log(val)
 
 
 def compute_scores(es, index, query_no, query_terms):
@@ -179,7 +180,7 @@ def compute_scores(es, index, query_no, query_terms):
             id, (tf, df), doc_len, ttf = docs[key]
             okapi_tf_scores[id] += okapi_tf(tf, doc_len)
             tf_idf_scores[id] += tf_idf(tf, doc_len, df)
-            okapi_bm25_scores[id] += okapi_bm25(tf, doc_len, df, k1=1.2, k2=300, b=0.75)
+            okapi_bm25_scores[id] += okapi_bm25(tf, query_terms.count(q_term), doc_len, df, k1=1.2, k2=100, b=0.75)
             unigram_lm_laplace_scores[id] += unigram_lm_laplace(tf, doc_len)
             unigram_lm_JM_scores[id] += unigram_lm_JM(tf, doc_len, ttf, 0.9)
     okapi_tf_result = get_top_k_docs(okapi_tf_scores, 100)
@@ -221,5 +222,5 @@ if __name__ == '__main__':
         for line in lines:
             if not line.startswith("\n"):
                 query_no, terms = analyze_query(es, index, line)
-                print("query_no: " + query_no)
+                print("\nquery_no: " + query_no+" :", end="")
                 compute_scores(es, index, query_no, terms)
