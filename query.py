@@ -89,7 +89,7 @@ def docs_postings(es, index, term):
         )
         ttf = 0
         for hit in results['hits']['hits']:
-            ttf += tf_df(hit['_explanation'])[1]
+            ttf += tf_df(hit['_explanation'])[0]
         docFreq = 0
         docs = {}
         for hit in results['hits']['hits']: # relevant docs
@@ -150,13 +150,14 @@ def okapi_bm25(tf, tf_q, doc_len, df, k1, k2, b):
            ((tf_q + k2 * tf_q) / (tf_q + k2))
 
 def unigram_lm_laplace(tf, doc_len):
+    if doc_len == 0:
+        return -1000
     global voc_size
     return math.log((tf + 1) / (doc_len + voc_size))
 
 def unigram_lm_JM(tf, doc_len, ttf, lambd):
     if doc_len == 0:
-        doc_len = 1
-        tf = 0
+        return -1000
     global total_docs, avg_length
     val = lambd * tf / doc_len + (1-lambd) * ttf / (total_docs * avg_length);
     return math.log(val)
@@ -182,7 +183,7 @@ def compute_scores(es, index, query_no, query_terms):
             tf_idf_scores[id] += tf_idf(tf, doc_len, df)
             okapi_bm25_scores[id] += okapi_bm25(tf, query_terms.count(q_term), doc_len, df, k1=1.2, k2=100, b=0.75)
             unigram_lm_laplace_scores[id] += unigram_lm_laplace(tf, doc_len)
-            unigram_lm_JM_scores[id] += unigram_lm_JM(tf, doc_len, ttf, 0.9)
+            unigram_lm_JM_scores[id] += unigram_lm_JM(tf, doc_len, ttf, 0.7)
     okapi_tf_result = get_top_k_docs(okapi_tf_scores, 100)
     tf_idf_result = get_top_k_docs(tf_idf_scores, 100)
     okapi_bm25_result = get_top_k_docs(okapi_bm25_scores, 100)
