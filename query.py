@@ -135,35 +135,27 @@ def analyze_query(es, index, line):
 #   tf_idf score
 #   okapi_bm23 score
 
-def okapi_tf(tf, doc_len):
-    global avg_length
+def okapi_tf(tf, doc_len, avg_length):
     return tf / (tf + 0.5 + 1.5 * (doc_len/avg_length))
 
-def tf_idf(tf, doc_len, df):
-    global total_docs
+def tf_idf(tf, doc_len, df, total_docs):
     return okapi_tf(tf, doc_len) * math.log(total_docs / df)
 
-def okapi_bm25(tf, tf_q, doc_len, df, k1, k2, b):
-    global total_docs, avg_length
+def okapi_bm25(tf, tf_q, doc_len, df, k1, k2, b, total_docs, avg_length):
     return math.log((total_docs + 0.5) / (df + 0.5)) * \
            ((tf + k1 * tf) / (tf + k1* ((1-b) + b * (doc_len / avg_length)))) * \
            ((tf_q + k2 * tf_q) / (tf_q + k2))
 
-def unigram_lm_laplace(tf, doc_len):
-    if doc_len == 0:
-        return -1000
-    global voc_size
+def unigram_lm_laplace(tf, doc_len, voc_size):
     return math.log((tf + 1) / (doc_len + voc_size))
 
-def unigram_lm_JM(tf, doc_len, ttf, lambd):
-    if doc_len == 0:
-        return -1000
-    global total_docs, avg_length
-    val = lambd * tf / doc_len + (1-lambd) * ttf / (total_docs * avg_length);
+def unigram_lm_JM(tf, doc_len, ttf, lambd, total_docs, avg_length):
+    val = lambd * tf / doc_len + (1-lambd) * ttf / (total_docs * avg_length)
     return math.log(val)
 
 
 def compute_scores(es, index, query_no, query_terms):
+    global avg_length, total_docs, voc_size
     okapi_tf_file = os.path.dirname(__file__) + '/results/okapi_tf.txt'
     tf_idf_file = os.path.dirname(__file__) + '/results/tf_idf.txt'
     okapi_bm25_file = os.path.dirname(__file__) + '/results/okapi_bm25.txt'
@@ -179,11 +171,13 @@ def compute_scores(es, index, query_no, query_terms):
          docs = docs_postings(es, index, q_term)
          for key in docs:
             id, (tf, df), doc_len, ttf = docs[key]
-            okapi_tf_scores[id] += okapi_tf(tf, doc_len)
-            tf_idf_scores[id] += tf_idf(tf, doc_len, df)
-            okapi_bm25_scores[id] += okapi_bm25(tf, query_terms.count(q_term), doc_len, df, k1=1.2, k2=100, b=0.75)
-            unigram_lm_laplace_scores[id] += unigram_lm_laplace(tf, doc_len)
-            unigram_lm_JM_scores[id] += unigram_lm_JM(tf, doc_len, ttf, 0.7)
+            okapi_tf_scores[id] += okapi_tf(tf, doc_len, avg_length)
+            tf_idf_scores[id] += tf_idf(tf, doc_len, df, total_docs)
+            okapi_bm25_scores[id] += okapi_bm25(tf, query_terms.count(q_term), doc_len,
+                                                df, 1.2, 100, 0.75, total_docs, avg_length)
+            unigram_lm_laplace_scores[id] += unigram_lm_laplace(tf, doc_len, voc_size)
+            unigram_lm_JM_scores[id] += unigram_lm_JM(tf, doc_len, ttf, 0.7, total_docs,
+                                                      avg_length)
     okapi_tf_result = get_top_k_docs(okapi_tf_scores, 100)
     tf_idf_result = get_top_k_docs(tf_idf_scores, 100)
     okapi_bm25_result = get_top_k_docs(okapi_bm25_scores, 100)
@@ -207,8 +201,8 @@ def remove_previous_results():
 
 
 if __name__ == '__main__':
-    query_file = os.path.dirname(__file__) + '/AP_DATA/query_desc.51-100.short.txt'
     remove_previous_results()
+    query_file = os.path.dirname(__file__) + '/AP_DATA/query_desc.51-100.short.txt'
     index = 'ap_dataset'
     doc_type = 'document'
     es = Elasticsearch(timeout=100)
