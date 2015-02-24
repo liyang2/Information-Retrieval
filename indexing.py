@@ -59,45 +59,61 @@ def prepare(mode):
 def tokens(text, regex):
     return [token.lower() for token in re.findall(regex, text)]
 
-
 def stopping_filter(token_list, stopwords):
     return filter(lambda x: x not in stopwords, token_list)
 
-# assume our memory is large enough
-def indexing(mode):
+# k means how many terms to index during each iteration of corpus
+def indexing(mode, k):
     assert mode in modes
     global ttf_counts, corpus_dir, term_ids, doc_ids, tokenize_regex, stopwords, stem_mappings
-    index = {}
-    for term in term_ids.keys():
-        index[term] = {}
-    for doc_entry in load.parse_docs(corpus_dir, '', ''):
-        doc_number = doc_entry['_id']
-        if not doc_ids.has_key(doc_number): # this doc is skipped during prepare()
-            continue
-        doc_id = doc_ids[doc_number]
-        print 'indexing():', doc_number
-        doc_tokens = tokens(doc_entry['text'], tokenize_regex)
-        for idx, token in enumerate(doc_tokens):
-            if mode in ['stopping', 'both'] and token in stopwords:
-                continue
-            if mode in ['stemming', 'both']:
-                token = mem_stem(token, stem_mappings)
 
-            if not index[token].has_key(doc_id):
-                index[token][doc_id] = [idx]
-            else:
-                index[token][doc_id].append(idx)
-    # write to file
+    progress = 0
+    cf = open('index/{}/category.txt'.format(mode), 'w')
     f = open('index/{}/index.txt'.format(mode), 'wb')
-    for term in index.keys():
-        print 'writing:',term
-        f.write(pack("=3L", term_ids[term], len(index[term]), ttf_counts[term]))
-        for doc_id in index[term]:
-            pos_arr = index[term][doc_id]
-            f.write(pack("=LH", doc_id, len(pos_arr)))
-            for pos in pos_arr:
-                f.write(pack("=H", pos))
+    while progress < len(ttf_counts):
+        print 'progress:',
+        index = defaultdict(lambda : {})
+        # in stemming mode, those words are stemmed
+        current_words = set(ttf_counts.keys()[progress : progress + k])
+        print progress
+
+        # go through the whole corpus
+        for doc_entry in load.parse_docs(corpus_dir, '', ''):
+            doc_number = doc_entry['_id']
+            if not doc_ids.has_key(doc_number): # this doc is skipped during prepare()
+                continue
+            doc_id = doc_ids[doc_number]
+            # print 'indexing():', doc_number
+            doc_tokens = tokens(doc_entry['text'], tokenize_regex)
+            for idx, token in enumerate(doc_tokens):
+                if mode in ['stopping', 'both'] and token in stopwords:
+                    continue
+                if mode in ['stemming', 'both']:
+                    token = mem_stem(token, stem_mappings)
+                if token not in current_words:
+                    continue
+
+                if not index[token].has_key(doc_id):
+                    index[token][doc_id] = [idx]
+                else:
+                    index[token][doc_id].append(idx)
+
+        # write to file
+        for term in index:
+            # print 'writing:',term
+            begin_offset = f.tell()
+            f.write(pack("=3L", term_ids[term], len(index[term]), ttf_counts[term]))
+            for doc_id in index[term]:
+                pos_arr = index[term][doc_id]
+                f.write(pack("=LH", doc_id, len(pos_arr)))
+                for pos in pos_arr:
+                    f.write(pack("=H", pos))
+            end_offset = f.tell()
+            cf.write(" ".join([term, `begin_offset`, `end_offset`]))
+
+        progress += k
     f.close()
+    cf.close()
 
 def load_stopwords():
     s = set()
@@ -110,7 +126,7 @@ def load_stopwords():
 
 
 if __name__ == '__main__':
-    mode = 'stemming'
+    mode = 'naive'
     corpus_dir = os.path.dirname(__file__) + '/AP_DATA/ap89_collection'
     ttf_counts = defaultdict(lambda : 0)
     term_ids = {}
@@ -123,7 +139,5 @@ if __name__ == '__main__':
     prepare(mode)
     print "term num: " + `len(term_ids)`
     print "doc num: " + `len(doc_ids)`
-    indexing(mode)
-
-
+    indexing(mode, 1000)
 
