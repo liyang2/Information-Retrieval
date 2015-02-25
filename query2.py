@@ -104,16 +104,15 @@ def compute_scores(query_no, query_terms, mode):
         query.write_result(unigram_lm_laplace_file, query_no, unigram_lm_laplace_result[i][1], i+1,
                      unigram_lm_laplace_result[i][0])
 
-def remove_previous_results(mode):
-    dir = os.path.dirname(__file__) + "/results2/{}".format(mode)
-    for subdir, dirs, files in os.walk(dir):
+def remove_previous_results(directory):
+    for subdir, dirs, files in os.walk(directory):
         for file in files:
             os.remove(os.path.join(subdir, file))
 
 
 if __name__ == '__main__':
-    mode = 'naive'
-    remove_previous_results(mode)
+    mode = 'stemming'
+    remove_previous_results('results2/{}'.format(mode))
     query_file = 'AP_DATA/query_desc.51-100.short.txt'
     tokenize_regex = r"[0-9A-Za-z]+\w*(?:\.?\w+)*"
     index = {}

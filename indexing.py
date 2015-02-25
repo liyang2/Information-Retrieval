@@ -71,6 +71,7 @@ def get_lines(begin_line, end_line):
 # k means how many terms to index during each iteration of corpus
 def indexing(mode, k):
     global line_info
+    assert mode in modes
     cache, fname = divide_and_conquer(mode, 1, len(line_info), k)
     # write cache to file
     with open('index/{}/cache.txt'.format(mode), 'w') as f:
@@ -79,7 +80,7 @@ def indexing(mode, k):
 
 
 def divide_and_conquer(mode, begin_line, end_line, k):
-    global doc_info
+    global doc_info, stopwords, stem_mappings
     cache = {} # term: (beginOffset, endOffset) in index file
     f_name = 'index/{}/index_{}.txt'.format(mode, next_unused_number())
 
@@ -91,6 +92,10 @@ def divide_and_conquer(mode, begin_line, end_line, k):
             doc_no, tokens = items[0], items[1:]
             doc_id = doc_info[doc_no]['doc_id']
             for pos, term in enumerate(tokens):
+                if mode in ['stopping', 'both'] and term in stopwords:
+                    continue
+                if mode in ['stemming', 'both']:
+                    term = stem_mappings[term]
                 if term in index:
                     index[term]['ttf'] += 1
                 else:
@@ -169,13 +174,19 @@ def load_stopwords():
                 s.add(line)
     return s
 
+import query2
+import time
 if __name__ == '__main__':
-    mode = 'naive'
+    start = time.time()
+    mode = 'both'
+    query2.remove_previous_results('index/{}'.format(mode))
     stopwords = load_stopwords()
     line_info, doc_info, stem_mappings = prepare()
-    print "unique terms: " + str(len(stem_mappings))
+    print "unique terms(include stopwords): " + str(len(stem_mappings))
     print "docs: " + str(len(doc_info))
     indexing(mode, 1000)
+    end = time.time()
+    print 'Time used: {0:.1f}m {1}s'.format((end-start) / 60, (end-start) % 60)
 
 
 
