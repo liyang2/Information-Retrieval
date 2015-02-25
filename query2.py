@@ -4,7 +4,6 @@
 
 from __future__ import division
 from collections import defaultdict
-from struct import *
 import query
 import os
 import re
@@ -12,43 +11,26 @@ import indexing
 from indexing import modes
 from stemming.porter2 import stem
 
-def recover(mode):
-    assert mode in modes
-    global df_counts, ttf_counts, id_to_term, id_to_doc_number, doc_lens, index
-    global total_docs, avg_length, voc_size
-    # id_to_doc_number, doc_lens
-    with open('index/{}/doc_id_mappings.txt'.format(mode), 'r') as f:
-        sum_doc_len = 0
+def get_doc_info():
+    doc_inf = {} # doc_id: {doc_no: 'xxx', doc_len: 'xxx'}
+    total_doc_len = 0
+    with open('index/doc_info.txt', 'r') as f:
         for line in f:
-            line = line.rstrip('\n')
-            doc_number, doc_id, doc_len = line.split(" ")
-            id_to_doc_number[int(doc_id)] = doc_number
-            doc_lens[int(doc_id)] = int(doc_len)
-            sum_doc_len += int(doc_len)
-    total_docs = len(doc_lens)
-    avg_length = sum_doc_len / total_docs
-    # id_to_term
-    with open('index/{}/term_id_mappings.txt'.format(mode), 'r') as f:
+            doc_no, doc_id, doc_len = line.rstrip('\n').split(' ')
+            doc_id, doc_len = int(doc_id), int(doc_len)
+            doc_inf[doc_id] = {'doc_no': doc_no, 'doc_len': doc_len}
+            total_doc_len += doc_len
+    return doc_inf, total_doc_len
+
+def get_term_offsets(mode):
+    term_offset ={} # term: (beginOffset, endOffset)
+    with open('index/{}/cache.txt'.format(mode)) as f:
         for line in f:
-            line = line.rstrip('\n')
-            term, term_id = line.split(" ")
-            id_to_term[int(term_id)] = term
-            index[term] = {}
-    voc_size = len(id_to_term)
-    # df_counts, ttf_counts, index
-    with open('index/{}/index.txt'.format(mode), 'rb') as f:
-        while True:
-            str = f.read(12)
-            if str == "":
-                break
-            term_id, df, ttf = unpack("=3L", str)
-            term = id_to_term[term_id]
-            df_counts[term] = df
-            ttf_counts[term] = ttf
-            for i in range(df): # how many docs
-                doc_id, tf = unpack("=LH", f.read(6))
-                pos_arr = unpack("="+`tf`+"H", f.read(tf * 2))
-                index[term][doc_id] = pos_arr
+            term, beginOffest, endOffset = line.rstrip('\n').split(' ')
+            beginOffest, endOffset = int(beginOffest), int(endOffset)
+            term_offset[term] = (beginOffest, endOffset)
+    return term_offset
+
 
 def analyze_query(line, tokenize_regex, mode):
     assert mode in modes
@@ -62,13 +44,29 @@ def analyze_query(line, tokenize_regex, mode):
     elif mode == 'stopping':
         terms = indexing.stopping_filter(terms, stopwords)
     elif mode == 'both':
-        terms = indexing.stem_filter(indexing.stopping_filter(terms, stopwords))
+        terms = map(stem, indexing.stopping_filter(terms, stopwords))
     return query_no, terms
+
+
+def read_index_entry(term, mode):
+    global term_offsets
+    index_entry = {'term': term, 'df': 0, 'ttf': 0, 'hits': {}}
+    term, df, ttf, d_blocks = indexing.get_index_entry_parts(indexing.read_file('index/{}/index_1.txt'.format(mode), term_offsets[term]))
+    index_entry['df'], index_entry['ttf'] = int(df), int(ttf)
+    i = 0
+    while i < len(d_blocks):
+        doc_id, tf = int(d_blocks[i]), int(d_blocks[i+1])
+        index_entry['hits'][doc_id] = []
+        i, j = i+2, 0
+        for j in xrange(tf):
+            index_entry['hits'][doc_id].append(int(d_blocks[i+j]))
+        i += tf
+    return index_entry
 
 
 def compute_scores(query_no, query_terms, mode):
     assert mode in modes
-    global index, df_counts, ttf_counts, doc_lens, avg_length, total_docs, voc_size
+    global doc_info, term_offsets, avg_length, total_docs, voc_size
     okapi_tf_file = 'results2/{}/okapi_tf.txt'.format(mode)
     okapi_bm25_file = 'results2/{}/okapi_bm25.txt'.format(mode)
     unigram_lm_laplace_file = 'results2/{}/unigram_lm_laplace.txt'.format(mode)
@@ -78,21 +76,22 @@ def compute_scores(query_no, query_terms, mode):
     unigram_lm_laplace_scores = defaultdict(lambda : 0.0)
 
     for q_term in query_terms:
-        if not index.has_key(q_term):
+        if q_term not in term_offsets:
             continue
         print q_term,
-        for doc_id in doc_lens:
-            doc_number = id_to_doc_number[doc_id]
-            doc_len = doc_lens[doc_id]
-            if index[q_term].has_key(doc_id):
-                pos_arr = index[q_term][doc_id]
+        entry = read_index_entry(q_term, mode)
+        for doc_id in doc_info:
+            doc_number = doc_info[doc_id]['doc_no']
+            doc_len = doc_info[doc_id]['doc_len']
+            if doc_id in entry['hits']:
+                pos_arr = entry['hits'][doc_id]
                 tf = len(pos_arr)
             else:
                 tf = 0
             okapi_tf_scores[doc_number] += query.okapi_tf(tf, doc_len, avg_length)
             okapi_bm25_scores[doc_number] += \
                 query.okapi_bm25(tf, query_terms.count(q_term), doc_len,
-                                 df_counts[q_term], 1.2, 100, 0.75, total_docs, avg_length)
+                                 entry['df'], 1.2, 100, 0.75, total_docs, avg_length)
             unigram_lm_laplace_scores[doc_number] += \
                 query.unigram_lm_laplace(tf, doc_len, voc_size)
     okapi_tf_result = query.get_top_k_docs(okapi_tf_scores, 100)
@@ -113,26 +112,25 @@ def remove_previous_results(mode):
 
 
 if __name__ == '__main__':
-    mode = 'stemming'
+    mode = 'naive'
     remove_previous_results(mode)
     query_file = 'AP_DATA/query_desc.51-100.short.txt'
     tokenize_regex = r"[0-9A-Za-z]+\w*(?:\.?\w+)*"
-    df_counts = {}
-    ttf_counts = {}
-    id_to_term = {}
-    id_to_doc_number = {}
-    doc_lens = {}
     index = {}
-    avg_length = voc_size = total_docs = 0
+    doc_info, total_doc_len = get_doc_info()
+    term_offsets = get_term_offsets(mode)
+    total_docs = len(doc_info)
+    avg_length = total_doc_len / total_docs
+    voc_size = len(term_offsets)
+
     stopwords = indexing.load_stopwords()
-    recover(mode)
-    print "Recover() done!"
-    print "avg_length: " + `avg_length`
-    print "voc_size: " + `voc_size`
-    print "total_docs: " + `total_docs`
+    print "avg_length: " + str(avg_length)
+    print "voc_size: " + str(voc_size)
+    print "total_docs: " + str(total_docs)
+
     with open(query_file) as f:
         for line in f:
-            if not line.startswith("\n"):
+            if line.strip():
                 query_no, terms = analyze_query(line, tokenize_regex, mode)
                 print "\nquery_no: " + query_no+" :",
                 compute_scores(query_no, terms, mode)

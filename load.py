@@ -72,7 +72,7 @@ def parse_docs(dir, index, doc_type):
                             '_index': index,
                             '_type': doc_type,
                             '_id': docno,
-                            'text': text
+                            'text': text.strip()
                         }
                     line = f.readline()
 
