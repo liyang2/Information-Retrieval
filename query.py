@@ -119,7 +119,7 @@ def foo(tuple):
 def get_top_k_docs(scores, k):
     pairs = [(-1 * score, id) for (id, score) in scores.iteritems()]
     heapq.heapify(pairs) # sorts by tuple[0]
-    return [foo(heapq.heappop(pairs)) for i in range(k)]
+    return [foo(heapq.heappop(pairs)) for i in xrange(k)]
 
 
 def analyze_query(es, index, line):

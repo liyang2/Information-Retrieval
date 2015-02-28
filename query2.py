@@ -109,9 +109,56 @@ def remove_previous_results(directory):
         for file in files:
             os.remove(os.path.join(subdir, file))
 
+def intersect(A, B):
+    return A.intersection(B)
+
+def get_span(pos_list):
+    return max(pos_list) - min(pos_list)
+
+def term_with_smallest_pos(pos_info):
+    best_term = pos_info.keys()[0]
+    smallest_pos = pos_info[best_term]['pos_list'][pos_info[best_term]['cur_index']]
+    for term in pos_info:
+        if pos_info[term]['pos_list'][pos_info[term]['cur_index']] < smallest_pos:
+            smallest_pos = pos_info[term]['pos_list'][pos_info[term]['cur_index']]
+            best_term = term
+    return best_term
+
+
+import operator
+def whether_break(pos_info):
+    return reduce(operator.or_, [pos_info[term]['cur_index'] == len(pos_info[term]['pos_list']) for term in pos_info])
+
+
+def compute_proximity_score(query_no, terms, mode):
+    global doc_info
+    index_entries = {}
+    scores = {} # doc_number : score
+    for q_term in terms:
+        index_entries[q_term] = read_index_entry(q_term, mode)
+    # C is a set of doc ids, each of which contains all terms
+    C = reduce(intersect, [set(index_entries[q_term]['hits'].keys()) for q_term in index_entries])
+    for doc_id in C:
+        pos_info = {} # for a particular doc, term: {'cur_index': xxx, 'pos_list': [xxx] }
+        for q_term in terms:
+            pos_info[q_term] = { 'cur_index': 0, 'pos_list': index_entries[q_term]['hits'][doc_id] }
+        min_span = doc_info[doc_id]['doc_len']  # potential max span
+        while not whether_break(pos_info):
+            pos_lst = [pos_info[term]['pos_list'][pos_info[term]['cur_index']] for term in pos_info]
+            min_span = min(min_span, get_span(pos_lst))
+            st = term_with_smallest_pos(pos_info)
+            pos_info[st]['cur_index'] += 1
+        scores[doc_info[doc_id]['doc_no']] = -1 * min_span
+
+    k = min(100, len(scores))
+    result = query.get_top_k_docs(scores, k)
+    for i in range(k):
+        query.write_result('results2/{}/proximity.txt'.format(mode), query_no, result[i][1], i+1, result[i][0])
+
+
 
 if __name__ == '__main__':
-    mode = 'stemming'
+    mode = 'both'
     remove_previous_results('results2/{}'.format(mode))
     query_file = 'AP_DATA/query_desc.51-100.short.txt'
     tokenize_regex = r"[0-9A-Za-z]+\w*(?:\.?\w+)*"
@@ -127,9 +174,14 @@ if __name__ == '__main__':
     print "voc_size: " + str(voc_size)
     print "total_docs: " + str(total_docs)
 
-    with open(query_file) as f:
-        for line in f:
-            if line.strip():
-                query_no, terms = analyze_query(line, tokenize_regex, mode)
-                print "\nquery_no: " + query_no+" :",
-                compute_scores(query_no, terms, mode)
+
+    my_query = 'atomic bomb'
+    print map(stem, my_query.split(' '))
+    compute_proximity_score('111', map(stem, my_query.split(' ')), 'both')
+    # with open(query_file) as f:
+    #     for line in f:
+    #         if line.strip():
+    #             query_no, terms = analyze_query(line, tokenize_regex, mode)
+    #             print "\nquery_no: " + query_no+" :",
+    #             compute_scores(query_no, terms, mode)
+    #             compute_proximity_score(query_no, terms, 'both')
