@@ -1,7 +1,9 @@
 .idea
 AP_DATA
 test.py
-test*.py
 .DS_Store
 *.pyc
 index/*
+util/secret.txt
+results/
+results2/
