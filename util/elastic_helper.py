@@ -22,6 +22,14 @@ def init_index():
                     },
                     'number_of_shards': 1,
                     'number_of_replicas': 0
+                },
+                "analysis": {
+                    "analyzer": {
+                        "my_english": {
+                            "type": "english",
+                            "stopwords_path": "stoplist.txt"
+                        }
+                    }
                 }
             }
         }
@@ -52,7 +60,7 @@ def init_index():
                         "type": "string",
                         "store": 'true',
                         "index": "analyzed",
-                        "analyzer": "standard"
+                        "analyzer": "my_english"
                     },
                     # in-links and out-links are array type
                     # but in elastic search, there is no special mapping for array type
@@ -70,8 +78,11 @@ def init_index():
     )
 
 
+# assume in_link_list and out_link_list are lists of urls, not ids
 def save_to_es(url, clean_text, raw_html, http_header, in_link_list, out_link_list):
     es = Elasticsearch()
+    in_link_list = map(lambda url: uuid.uuid5(uuid.NAMESPACE_DNS, url), in_link_list)
+    out_link_list = map(lambda url: uuid.uuid5(uuid.NAMESPACE_DNS, url), out_link_list)
     doc = {
         'url': url,
         'html': raw_html,
