@@ -78,11 +78,15 @@ def init_index():
     )
 
 
+def url_to_uuid(url):
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, url))
+
+
 # assume in_link_list and out_link_list are lists of urls, not ids
 def save_to_es(url, clean_text, raw_html, http_header, in_link_list, out_link_list):
     es = Elasticsearch()
-    in_link_list = map(lambda url: uuid.uuid5(uuid.NAMESPACE_DNS, url), in_link_list)
-    out_link_list = map(lambda url: uuid.uuid5(uuid.NAMESPACE_DNS, url), out_link_list)
+    in_link_list = map(url_to_uuid, in_link_list)
+    out_link_list = map(url_to_uuid, out_link_list)
     doc = {
         'url': url,
         'html': raw_html,
@@ -93,7 +97,27 @@ def save_to_es(url, clean_text, raw_html, http_header, in_link_list, out_link_li
     }
     ret = es.index(index=index_name,
                    doc_type=doc_type,
-                   id=uuid.uuid5(uuid.NAMESPACE_DNS, url),
+                   id=url_to_uuid(url),
                    body=doc)
     return ret['created']
 
+
+def es_update_inlinks(url, in_links):
+    es = Elasticsearch()
+    in_links = map(url_to_uuid, in_links)
+    doc = {
+        'doc': {
+            'in-links': in_links
+        }
+    }
+    ret = es.update(index=index_name,
+                   doc_type=doc_type,
+                   id=url_to_uuid(url),
+                   body=doc)
+    print dir(ret)
+    return ret['update']
+
+
+if __name__ == '__main__':
+    # print save_to_es('url2', 'clean text', 'raw html', 'headers', [], ['a','b','c'])
+    print es_update_inlinks('url', ['aa','bb'])
