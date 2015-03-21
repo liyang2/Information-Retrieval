@@ -3,9 +3,29 @@ import time
 from urlparse import urlparse
 
 
+def get_wrapper(url, retries=3):
+    while retries > 0:
+        try:
+            return requests.get(url, timeout=10)
+        except:
+            pass
+        retries -= 1
+    return None
+
+
+def head_wrapper(url, retries=3):
+    while retries > 0:
+        try:
+            return requests.head(url, timeout=10)
+        except:
+            pass
+        retries -= 1
+    return None
+
+
 def is_html(url):
-    r = requests.head(url)
-    if r.headers.get('content-type'):
+    r = head_wrapper(url)
+    if r and r.headers.get('content-type'):
         return 'text/html' in r.headers['content-type']
     else:
         return False
@@ -22,11 +42,11 @@ def fetch_html(url):
         if time_delta < 1:
             time.sleep(1 - time_delta)
     domain_visit[domain(url)] = time.time()
-    r = requests.get(url)
-    if r.status_code == 200:
+    r = get_wrapper(url)
+    if r and r.status_code == 200:
         return r.headers, unicode(r.content, r.encoding) # so we are safe in unicode
     else:
-        raise UrlException("Status code != 200")
+        raise UrlException("Network error")
 
 
 class UrlException(Exception):

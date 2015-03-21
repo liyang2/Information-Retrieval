@@ -12,7 +12,6 @@ from util import http
 
 MAX_CRAWL = 12000
 seed_urls = ['http://en.wikipedia.org/wiki/List_of_highest-grossing_films',
-             'http://www.boxofficemojo.com/alltime/',
              'http://www.the-numbers.com/movie/records/',
              'http://www.filmsite.org/boxoffice.html',
              'http://www.imdb.com/boxoffice/alltimegross',
@@ -103,6 +102,8 @@ def out_links(html, url_str):
         else:  # like hello.html
             links.add(url_str+'/'+link)
     links = set(map(urlnorm.norms, links))
+    if None in links:
+        links.remove(None)
     return links
 
 
@@ -114,6 +115,7 @@ def start_crawl():
 
     while queue and len(crawled) < MAX_CRAWL:
         url = next_best(queue)
+        print "url off queue:", url
         in_links_to_url = queue[url]['in']
         del queue[url]
 
@@ -144,6 +146,10 @@ def start_crawl():
         print 'Updating in-links for', url
         elastic_helper.es_update_inlinks(url, crawled[url])
 
+    # print problem urls
+    for p in urlnorm.problem_url_set:
+        print p
+
 
 if __name__ == '__main__':
     elastic_helper.init_index()
@@ -153,3 +159,5 @@ if __name__ == '__main__':
     print "Time elapsed: %d mins %d secs" % ((end_time - start_time) / 60, (end_time-start_time) % 60)
 
 
+# if __name__ == '__main__':
+#     inspect('http://en.wikipedia.org/wiki/Metahuman')

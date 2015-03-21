@@ -94,7 +94,7 @@ def init_index():
 
 
 def url_to_uuid(url):
-    return uuid.uuid5(uuid.NAMESPACE_URL, url.encode('utf-8'))
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, url.encode('utf-8')))
 
 
 
@@ -106,18 +106,18 @@ def save_to_es(url, clean_text, raw_html, http_header, in_link_list, out_link_li
     doc = {
         'url': url,
         'html': raw_html,
-        # 'header': http_header,
-        # 'text': clean_text,
-        # 'in-links': in_link_list,
-        # 'out-links': out_link_list
+        'header': http_header,
+        'text': clean_text,
+        'in-links': in_link_list,
+        'out-links': out_link_list
     }
-    try:
-        ret = es.index(index=index_name,
-                   doc_type=doc_type,
-                   id=url_to_uuid(url),
-                   body=doc)
-    except:
-        raise Exception('UnicodeDecodeError, url is', url)
+    # try:
+    ret = es.index(index=index_name,
+               doc_type=doc_type,
+               id=url_to_uuid(url),
+               body=doc)
+    # except:
+    #     raise Exception('UnicodeDecodeError, url is', url)
 
     return ret['created']
 
