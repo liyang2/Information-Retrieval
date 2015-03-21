@@ -110,36 +110,42 @@ def out_links(html, url_str):
 def start_crawl():
     crawled = {}  # url: set()
     queue = {}
+    saved = {} # url: (headers, raw_html)
     for url in seed_urls:
-        queue[url] = {'in': set(), 'count': next(counter)}
+        headers, html = http.fetch_html(url)
+        queue[url] = {'in': set(), 'count': next(counter), 'headers': headers, 'html': html}
 
+    # we assume all elements in queue has already been crawled but not analyzed
     while queue and len(crawled) < MAX_CRAWL:
         url = next_best(queue)
-        print "url off queue:", url
-        in_links_to_url = queue[url]['in']
-        del queue[url]
 
-        if not http.is_html(url):
-            continue
-        try:
-            headers, html, clean, out = inspect(url)
-            # discard its out links and refuse to store it to ES if page is not movie-related
-            if not movie_related(clean):
-                continue
-        except http.UrlException:
-            continue
+        in_links_to_url, c, headers, html = \
+            queue[url]['in'], queue[url]['count'], queue[url]['headers'], queue[url]['html']
+        clean_html = remove_html_tags(html)
+        out = out_links(html, url)
+
+        del queue[url]
 
         print "current url", url, "in-link: ", len(in_links_to_url)
         print "current progress %d / %d" % (len(crawled), MAX_CRAWL)
+
         crawled[url] = in_links_to_url
-        elastic_helper.save_to_es(url, clean, html, str(headers), [], out)  # missing in-links
+        elastic_helper.save_to_es(url, clean_html, html, str(headers), [], out)  # missing in-links
+
         for out_link in out:
             if out_link in crawled:
                 crawled[out_link].add(url)
             elif out_link in queue:
                 queue[out_link]['in'].add(url)
             else:
-                queue[out_link] = {'in': set(), 'count': next(counter)}
+                # crawl then decide whether to enqueue
+                if not http.is_html(out_link):
+                    continue
+                headers_out, html_out = http.fetch_html(out_link)
+                if not movie_related(html_out):
+                    continue
+
+                queue[out_link] = {'in': set([url]), 'count': next(counter), 'headers': headers_out, 'html': html_out}
 
     # update in-links to ES
     for url in crawled:
