@@ -1,3 +1,4 @@
+# encoding=utf-8
 from elasticsearch import Elasticsearch
 import uuid
 
@@ -93,7 +94,7 @@ def init_index():
 
 
 def url_to_uuid(url):
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, url))
+    return uuid.uuid5(uuid.NAMESPACE_URL, url.encode('utf-8'))
 
 
 
@@ -137,4 +138,6 @@ def es_update_inlinks(url, in_links):
 
 
 if __name__ == '__main__':
-    pass
+    str1 = u'abc我'
+    print uuid.uuid5(uuid.NAMESPACE_DNS, str1.encode('utf-8'))
+    print uuid.uuid5(uuid.NAMESPACE_DNS, 'abc')

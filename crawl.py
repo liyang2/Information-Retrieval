@@ -9,9 +9,6 @@ from util import elastic_helper
 from util import urlnorm
 from util import http
 
-import sys
-reload(sys)
-sys.setdefaultencoding("utf-8")
 
 MAX_CRAWL = 12000
 seed_urls = ['http://en.wikipedia.org/wiki/List_of_highest-grossing_films',
@@ -45,17 +42,14 @@ def next_best(queue):
 def visible(element):
     if element.parent.name in ['style', 'script', '[document]', 'head', 'title']:
         return False
-    elif re.match('<!--.*-->', str(element)):
+    elif re.match('<!--.*-->', unicode(element)):
         return False
     return True
 
 # text = soup.findAll(text=True)
-def clean_text(text):
-    visible_text = filter(visible, text)
-    texts = ''
-    for item in visible_text:
-        texts += item.encode('utf-8')
-    return texts
+def clean_text(texts):
+    visible_text = filter(visible, texts)
+    return ''.join(visible_text)
 
 def remove_html_tags(html):
     soup = BeautifulSoup(html)
@@ -84,9 +78,9 @@ def out_links(html, url_str):
         if item is None:
             return None
         try:
-            return str(item.get('href'))
+            return item.get('href')
         except:
-            print "This url seems to have unicode", item.get('href')
+            print "This url seems to have unicode", item.get(u'href')
             return None
 
     def my_filter(item):
@@ -95,6 +89,7 @@ def out_links(html, url_str):
         return True
 
     links = set()
+
     soup = BeautifulSoup(html)
     original_links = filter(my_filter, map(my_map_func, soup.find_all('a')))
 
