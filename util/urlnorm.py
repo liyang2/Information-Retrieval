@@ -88,6 +88,8 @@ def norms(urlstring):
     # http://www.example.com/a.html#anything -> http://www.example.com/a.html
     if '#' in urlstring:
         urlstring = urlstring[:urlstring.rindex('#')]
+    if not urlstring.startswith('http'):
+        urlstring = 'http://' + urlstring
 
     return urlunparse(norm(urlparse(urlstring)))
 

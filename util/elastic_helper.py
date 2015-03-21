@@ -25,8 +25,25 @@ def init_index():
                 },
                 "analysis": {
                     "analyzer": {
-                        "my_english": {
-                            "type": "english",
+                        "my_analyzer": {
+                            "type": "custom",
+                            "tokenizer": "myTokenizer",
+                            "filter": ["myLengthFilter", "myStopFilter"]
+                        }
+                    },
+                    "tokenizer": {
+                        "myTokenizer": {
+                            "type": "standard",
+                            "max_token_length": 255
+                        }
+                    },
+                    "filter": {
+                        "myLengthFilter": {
+                            "type": "length",
+                            "max": 255
+                        },
+                        "myStopFilter":{
+                            "type": "stop",
                             "stopwords_path": "stoplist.txt"
                         }
                     }
@@ -44,23 +61,20 @@ def init_index():
                     "url":{ # canonical url
                         "type": "string",
                         "store": "true",
-                        "index": "not_analyzed"
                     },
                     "html": { # raw html text
                         "type": "string",
                         "store": 'true',
-                        "index": "not_analyzed"
                     },
                     "header": { # http header
                         "type": "string",
                         "store": "true",
-                        "index": "not_analyzed"
                     },
                     "text": { # cleaned main content text of html
                         "type": "string",
                         "store": 'true',
                         "index": "analyzed",
-                        "analyzer": "my_english"
+                        "analyzer": "my_analyzer"
                     },
                     # in-links and out-links are array type
                     # but in elastic search, there is no special mapping for array type
@@ -79,7 +93,8 @@ def init_index():
 
 
 def url_to_uuid(url):
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, url))
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, url))
+
 
 
 # assume in_link_list and out_link_list are lists of urls, not ids
@@ -90,15 +105,19 @@ def save_to_es(url, clean_text, raw_html, http_header, in_link_list, out_link_li
     doc = {
         'url': url,
         'html': raw_html,
-        'header': http_header,
-        'text': clean_text,
-        'in-links': in_link_list,
-        'out-links': out_link_list
+        # 'header': http_header,
+        # 'text': clean_text,
+        # 'in-links': in_link_list,
+        # 'out-links': out_link_list
     }
-    ret = es.index(index=index_name,
+    try:
+        ret = es.index(index=index_name,
                    doc_type=doc_type,
                    id=url_to_uuid(url),
                    body=doc)
+    except:
+        raise Exception('UnicodeDecodeError, url is', url)
+
     return ret['created']
 
 
@@ -107,17 +126,15 @@ def es_update_inlinks(url, in_links):
     in_links = map(url_to_uuid, in_links)
     doc = {
         'doc': {
-            'in-links': in_links
+            'in-links': in_links,
+            'in-links-count': len(in_links)
         }
     }
     ret = es.update(index=index_name,
                    doc_type=doc_type,
                    id=url_to_uuid(url),
                    body=doc)
-    print dir(ret)
-    return ret['update']
 
 
 if __name__ == '__main__':
-    # print save_to_es('url2', 'clean text', 'raw html', 'headers', [], ['a','b','c'])
-    print es_update_inlinks('url', ['aa','bb'])
+    pass
