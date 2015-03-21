@@ -33,7 +33,7 @@ def next_best(queue):
         in_links = len(queue[url]['in'])
         time_stayed = queue[url]['count']
         if in_links > len(queue[ret]['in']) or (in_links == len(queue[ret]['in'])
-                                                and time_stayed > queue[ret]['count']):
+                                                and time_stayed < queue[ret]['count']):
             ret = url
     return ret
 
@@ -77,7 +77,7 @@ def out_links(html, url_str):
         if item is None:
             return None
         try:
-            return item.get('href')
+            return unicode(item.get('href'))
         except:
             print "This url seems to have unicode", item.get(u'href')
             return None
@@ -108,9 +108,11 @@ def out_links(html, url_str):
 
 
 def start_crawl():
+    saved = 0  # number of pages saved to ES
+    stop_crawl = False
     crawled = {}  # url: set()
     queue = {}
-    saved = {} # url: (headers, raw_html)
+    rubbish = set()
     for url in seed_urls:
         headers, html = http.fetch_html(url)
         queue[url] = {'in': set(), 'count': next(counter), 'headers': headers, 'html': html}
@@ -125,14 +127,20 @@ def start_crawl():
         out = out_links(html, url)
 
         del queue[url]
-
-        print "current url", url, "in-link: ", len(in_links_to_url)
-        print "current progress %d / %d" % (len(crawled), MAX_CRAWL)
+        print "off queue:", url
 
         crawled[url] = in_links_to_url
         elastic_helper.save_to_es(url, clean_html, html, str(headers), [], out)  # missing in-links
+        saved += 1
+
+        if saved + len(queue) > MAX_CRAWL:
+            stop_crawl = True
+        if stop_crawl:
+            continue
 
         for out_link in out:
+            if out_link in rubbish:
+                continue
             if out_link in crawled:
                 crawled[out_link].add(url)
             elif out_link in queue:
@@ -140,12 +148,16 @@ def start_crawl():
             else:
                 # crawl then decide whether to enqueue
                 if not http.is_html(out_link):
+                    rubbish.add(out_link)
                     continue
                 headers_out, html_out = http.fetch_html(out_link)
                 if not movie_related(html_out):
+                    rubbish.add(out_link)
                     continue
 
                 queue[out_link] = {'in': set([url]), 'count': next(counter), 'headers': headers_out, 'html': html_out}
+                print "saved + len(queue) : %d" % (saved + len(queue))
+                print "enqueue:", out_link
 
     # update in-links to ES
     for url in crawled:

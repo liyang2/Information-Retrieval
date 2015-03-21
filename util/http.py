@@ -44,7 +44,7 @@ def fetch_html(url):
     domain_visit[domain(url)] = time.time()
     r = get_wrapper(url)
     if r and r.status_code == 200:
-        return r.headers, unicode(r.content, r.encoding) # so we are safe in unicode
+        return r.headers, unicode(r.content, r.encoding, 'ignore') # so we are safe in unicode
     else:
         raise UrlException("Network error")
 
