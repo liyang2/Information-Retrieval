@@ -3,20 +3,20 @@ import time
 from urlparse import urlparse
 
 
-def get_wrapper(url, retries=3):
+def get_wrapper(url, retries=1):
     while retries > 0:
         try:
-            return requests.get(url, timeout=10)
+            return requests.get(url, timeout=5)
         except:
             pass
         retries -= 1
     return None
 
 
-def head_wrapper(url, retries=3):
+def head_wrapper(url, retries=1):
     while retries > 0:
         try:
-            return requests.head(url, timeout=10)
+            return requests.head(url, timeout=5)
         except:
             pass
         retries -= 1
@@ -46,7 +46,7 @@ def fetch_html(url):
     if r and r.status_code == 200:
         return r.headers, unicode(r.content, r.encoding, 'ignore') # so we are safe in unicode
     else:
-        raise UrlException("Network error")
+        raise UrlException("Network error: %s" % url)
 
 
 class UrlException(Exception):

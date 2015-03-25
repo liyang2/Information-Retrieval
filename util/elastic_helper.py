@@ -6,6 +6,10 @@ index_name = 'hw3'
 doc_type = 'page'
 
 
+def url_to_uuid(url):
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, url.encode('utf-8')))
+
+
 def init_index():
     client = Elasticsearch(timeout=100)
 
@@ -23,31 +27,6 @@ def init_index():
                     },
                     'number_of_shards': 1,
                     'number_of_replicas': 0
-                },
-                "analysis": {
-                    "analyzer": {
-                        "my_analyzer": {
-                            "type": "custom",
-                            "tokenizer": "myTokenizer",
-                            "filter": ["myLengthFilter", "myStopFilter"]
-                        }
-                    },
-                    "tokenizer": {
-                        "myTokenizer": {
-                            "type": "standard",
-                            "max_token_length": 255
-                        }
-                    },
-                    "filter": {
-                        "myLengthFilter": {
-                            "type": "length",
-                            "max": 255
-                        },
-                        "myStopFilter":{
-                            "type": "stop",
-                            "stopwords_path": "stoplist.txt"
-                        }
-                    }
                 }
             }
         }
@@ -75,7 +54,7 @@ def init_index():
                         "type": "string",
                         "store": 'true',
                         "index": "analyzed",
-                        "analyzer": "my_analyzer"
+                        "analyzer": "standard"
                     },
                     # in-links and out-links are array type
                     # but in elastic search, there is no special mapping for array type
@@ -91,11 +70,6 @@ def init_index():
             }
         }
     )
-
-
-def url_to_uuid(url):
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, url.encode('utf-8')))
-
 
 
 # assume in_link_list and out_link_list are lists of urls, not ids
@@ -137,7 +111,25 @@ def es_update_inlinks(url, in_links):
                    body=doc)
 
 
+# returned fields: url, header, in-links, out-links
+# 'text' and 'html' are skipped because too big
+def get_all():
+    es = Elasticsearch(timeout=100)
+    results = es.search(
+        index=index_name, doc_type=doc_type, size=12000, body={
+            "query": {
+                "match_all": {}
+            },
+            "fields": ["url", "header", "in-links", "out-links"]
+        }
+    )
+    return results['hits']['hits']
+
+
+def get_single(doc_id):
+    es = Elasticsearch(timeout=100)
+    ret = es.get(index=index_name, doc_type=doc_type, id=doc_id)
+    return ret
+
 if __name__ == '__main__':
-    str1 = u'abc我'
-    print uuid.uuid5(uuid.NAMESPACE_DNS, str1.encode('utf-8'))
-    print uuid.uuid5(uuid.NAMESPACE_DNS, 'abc')
+    init_index()
