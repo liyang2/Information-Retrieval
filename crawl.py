@@ -108,71 +108,25 @@ def out_links(html, url_str):
 
 
 def start_crawl():
-    saved = 0  # number of pages saved to ES
-    stop_crawl = False
-    crawled = {}  # url: set()
+    crawled = defaultdict(set)  # url: set() of in-links
     queue = {}
-    rubbish = set()
+    in_ES = set() # urls
+    saved_out = {}  # url: set() of out-links
+    rubbish = set() # crawled but not related to movie
+
     for url in seed_urls:
-        headers, html = http.fetch_html(url)
-        queue[url] = {'in': set(), 'count': next(counter), 'headers': headers, 'html': html}
-
-    # we assume all elements in queue has already been crawled but not analyzed
-    while queue and len(crawled) < MAX_CRAWL:
-        url = next_best(queue) if not stop_crawl else queue.iterkeys().next()
-
-        in_links_to_url, c, headers, html = \
-            queue[url]['in'], queue[url]['count'], queue[url]['headers'], queue[url]['html']
-        clean_html = remove_html_tags(html)
-        out = out_links(html, url)
-
-        del queue[url]
-        print "off queue:", url
-
-        crawled[url] = in_links_to_url
-        elastic_helper.save_to_es(url, clean_html, html, str(headers), [], out)  # missing in-links
-        saved += 1
+        queue[url] = {'in': set(), 'count': next(counter)}
 
 
-        for out_link in out:
-            if out_link in rubbish:
-                continue
-            if out_link in crawled:
-                crawled[out_link].add(url)
-            elif out_link in queue:
-                queue[out_link]['in'].add(url)
-            else:
-                if stop_crawl:
-                    continue
+    while queue:
+        pass
 
-                # crawl then decide whether to enqueue
-                if not http.is_html(out_link):
-                    rubbish.add(out_link)
-                    continue
-                try:
-                    headers_out, html_out = http.fetch_html(out_link)
-                except http.UrlException:
-                    continue
-                if not movie_related(html_out):
-                    rubbish.add(out_link)
-                    continue
-
-                queue[out_link] = {'in': set([url]), 'count': next(counter), 'headers': headers_out, 'html': html_out}
-                print "saved + len(queue) : %d" % (saved + len(queue))
-                print "enqueue:", out_link
-
-                if saved + len(queue) > MAX_CRAWL:
-                    stop_crawl = True
-                    continue
 
     # update in-links to ES
     for url in crawled:
         print 'Updating in-links for', url
         elastic_helper.es_update_inlinks(url, crawled[url])
 
-    # print problem urls
-    for p in urlnorm.problem_url_set:
-        print p
 
 
 if __name__ == '__main__':

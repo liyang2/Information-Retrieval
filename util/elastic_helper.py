@@ -5,9 +5,11 @@ import uuid
 index_name = 'hw3'
 doc_type = 'page'
 
-
+uuid_to_url = {}
 def url_to_uuid(url):
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, url.encode('utf-8')))
+    uuid_str = str(uuid.uuid5(uuid.NAMESPACE_URL, url.encode('utf-8')))
+    uuid_to_url[uuid_str] = url
+    return uuid_str
 
 
 def init_index():
@@ -113,10 +115,10 @@ def es_update_inlinks(url, in_links):
 
 # returned fields: url, header, in-links, out-links
 # 'text' and 'html' are skipped because too big
-def get_all():
+def get_all(size):
     es = Elasticsearch(timeout=100)
     results = es.search(
-        index=index_name, doc_type=doc_type, size=12000, body={
+        index=index_name, doc_type=doc_type, size=size, body={
             "query": {
                 "match_all": {}
             },
