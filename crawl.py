@@ -119,7 +119,7 @@ def start_crawl():
 
     # we assume all elements in queue has already been crawled but not analyzed
     while queue and len(crawled) < MAX_CRAWL:
-        url = next_best(queue)
+        url = next_best(queue) if not stop_crawl else queue.iterkeys().next()
 
         in_links_to_url, c, headers, html = \
             queue[url]['in'], queue[url]['count'], queue[url]['headers'], queue[url]['html']
@@ -133,10 +133,6 @@ def start_crawl():
         elastic_helper.save_to_es(url, clean_html, html, str(headers), [], out)  # missing in-links
         saved += 1
 
-        if saved + len(queue) > MAX_CRAWL:
-            stop_crawl = True
-        if stop_crawl:
-            continue
 
         for out_link in out:
             if out_link in rubbish:
@@ -146,11 +142,17 @@ def start_crawl():
             elif out_link in queue:
                 queue[out_link]['in'].add(url)
             else:
+                if stop_crawl:
+                    continue
+
                 # crawl then decide whether to enqueue
                 if not http.is_html(out_link):
                     rubbish.add(out_link)
                     continue
-                headers_out, html_out = http.fetch_html(out_link)
+                try:
+                    headers_out, html_out = http.fetch_html(out_link)
+                except http.UrlException:
+                    continue
                 if not movie_related(html_out):
                     rubbish.add(out_link)
                     continue
@@ -158,6 +160,10 @@ def start_crawl():
                 queue[out_link] = {'in': set([url]), 'count': next(counter), 'headers': headers_out, 'html': html_out}
                 print "saved + len(queue) : %d" % (saved + len(queue))
                 print "enqueue:", out_link
+
+                if saved + len(queue) > MAX_CRAWL:
+                    stop_crawl = True
+                    continue
 
     # update in-links to ES
     for url in crawled:
