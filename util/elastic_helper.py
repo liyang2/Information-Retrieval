@@ -2,7 +2,7 @@
 from elasticsearch import Elasticsearch
 import uuid
 
-index_name = 'hw3'
+index_name = 'hw4'
 doc_type = 'page'
 
 uuid_to_url = {}
@@ -73,12 +73,18 @@ def init_index():
         }
     )
 
+def unicode_to_bytes(str):
+    return str.encode('utf-8', 'ignore')
+
 
 # assume in_link_list and out_link_list are lists of urls, not ids
 def save_to_es(url, clean_text, raw_html, http_header, in_link_list, out_link_list):
+    # unicode to bytes
+    url = unicode_to_bytes(url)
+    in_link_list = map(unicode_to_bytes, in_link_list)
+    out_link_list = map(unicode_to_bytes, out_link_list)
+
     es = Elasticsearch()
-    in_link_list = map(url_to_uuid, in_link_list)
-    out_link_list = map(url_to_uuid, out_link_list)
     doc = {
         'url': url,
         'html': raw_html,
@@ -87,20 +93,18 @@ def save_to_es(url, clean_text, raw_html, http_header, in_link_list, out_link_li
         'in-links': in_link_list,
         'out-links': out_link_list
     }
-    # try:
     ret = es.index(index=index_name,
                doc_type=doc_type,
-               id=url_to_uuid(url),
+               id=url,
                body=doc)
-    # except:
-    #     raise Exception('UnicodeDecodeError, url is', url)
-
     return ret['created']
 
 
 def es_update_inlinks(url, in_links):
+    url = unicode_to_bytes(url)
+    in_links = map(unicode_to_bytes, in_links)
+
     es = Elasticsearch()
-    in_links = map(url_to_uuid, in_links)
     doc = {
         'doc': {
             'in-links': in_links,
@@ -109,7 +113,7 @@ def es_update_inlinks(url, in_links):
     }
     ret = es.update(index=index_name,
                    doc_type=doc_type,
-                   id=url_to_uuid(url),
+                   id=url,
                    body=doc)
 
 

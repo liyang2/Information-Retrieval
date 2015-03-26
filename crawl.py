@@ -12,6 +12,7 @@ from util import http
 
 MAX_CRAWL = 12000
 seed_urls = ['http://en.wikipedia.org/wiki/List_of_highest-grossing_films',
+             'http://www.boxofficemojo.com/',
              'http://www.the-numbers.com/movie/records/',
              'http://www.filmsite.org/boxoffice.html',
              'http://www.imdb.com/boxoffice/alltimegross',
@@ -22,14 +23,23 @@ seed_urls = ['http://en.wikipedia.org/wiki/List_of_highest-grossing_films',
 counter = itertools.count()
 
 
-def next_best(queue):
+def next_best(queue, last):
     if not queue:
         raise KeyError('Queue is empty')
 
-    ret = queue.iterkeys().next()
+    if last and not http.whether_need_wait(last):
+        last = None
+
+    queue_iter = queue.iterkeys()
+    ret = queue_iter.next()
+    while last and http.domain(last) == http.domain(ret):
+        ret = queue_iter.next()
+
     for url in queue:
         if url in seed_urls:
             return url
+        if last and http.domain(url) == http.domain(last):
+            continue
         in_links = len(queue[url]['in'])
         time_stayed = queue[url]['count']
         if in_links > len(queue[ret]['in']) or (in_links == len(queue[ret]['in'])
@@ -108,19 +118,50 @@ def out_links(html, url_str):
 
 
 def start_crawl():
-    crawled = defaultdict(set)  # url: set() of in-links
+    crawled = {}  # url: set() of in-links
     queue = {}
-    in_ES = set() # urls
-    saved_out = {}  # url: set() of out-links
-    rubbish = set() # crawled but not related to movie
+    rubbish = set()  # urls that are not movie-related
+    last = None  # last crawled url
 
     for url in seed_urls:
         queue[url] = {'in': set(), 'count': next(counter)}
 
+    while queue and len(crawled) < MAX_CRAWL:
+        url = next_best(queue, last)
+        in_links_to_url = queue[url]['in']
+        del queue[url]
 
-    while queue:
-        pass
+        try:
+            headers, html, clean, out = inspect(url)
+            last = url
 
+            # discard if page is not html type
+            if not http.is_html(headers):
+                rubbish.add(url)
+                print 'skipping (not html)'
+                continue
+
+            # discard its out links and refuse to store it to ES if page is not movie-related
+            if not movie_related(clean):
+                rubbish.add(url)
+                print 'skipping (not movie)'
+                continue
+        except http.UrlException:
+            print 'skipping (UrlException)'
+            continue
+
+        print "current(%d)" % len(crawled), url, "in-link: ", len(in_links_to_url)
+        crawled[url] = in_links_to_url
+        elastic_helper.save_to_es(url, clean, html, str(headers), [], out)  # missing in-links
+        for out_link in out:
+            if out_link in rubbish:
+                continue
+            if out_link in crawled:
+                crawled[out_link].add(url)
+            elif out_link in queue:
+                queue[out_link]['in'].add(url)
+            else:
+                queue[out_link] = {'in': set([url]), 'count': next(counter)}
 
     # update in-links to ES
     for url in crawled:
@@ -138,4 +179,4 @@ if __name__ == '__main__':
 
 
 # if __name__ == '__main__':
-#     inspect('http://en.wikipedia.org/wiki/Metahuman')
+    inspect('http://en.wikipedia.org/wiki/Metahuman')
