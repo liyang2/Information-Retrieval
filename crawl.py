@@ -4,6 +4,7 @@ import time
 from bs4 import BeautifulSoup
 import urllib
 import re
+from pqdict import PQDict
 
 from util import elastic_helper
 from util import urlnorm
@@ -119,21 +120,25 @@ def out_links(html, url_str):
 
 def start_crawl():
     crawled = {}  # url: set() of in-links
-    queue = {}
+    pq = PQDict.maxpq()
     rubbish = set()  # urls that are not movie-related
-    last = None  # last crawled url
 
     for url in seed_urls:
-        queue[url] = {'in': set(), 'count': next(counter)}
+        pq[url] = (0, next(counter) * -1, set())  # (len(in_links), time stayed in queue, in_links)
 
-    while queue and len(crawled) < MAX_CRAWL:
-        url = next_best(queue, last)
-        in_links_to_url = queue[url]['in']
-        del queue[url]
+    while pq and len(crawled) < MAX_CRAWL:
+        url, value = pq.popitem()
+        temp_save = []
+        while http.whether_need_wait(url):
+            temp_save.append((url, value))
+            url, value = pq.popitem()
+        for url_t, value_t in temp_save:
+            pq[url_t] = value_t
+
+        in_links_to_url = value[2]
 
         try:
             headers, html, clean, out = inspect(url)
-            last = url
 
             # discard if page is not html type
             if not http.is_html(headers):
@@ -158,10 +163,12 @@ def start_crawl():
                 continue
             if out_link in crawled:
                 crawled[out_link].add(url)
-            elif out_link in queue:
-                queue[out_link]['in'].add(url)
+            elif out_link in pq:
+                item = pq[out_link]
+                item[2].add(url)
+                pq.updateitem(out_link, (item[0]+1, item[1], item[2]))
             else:
-                queue[out_link] = {'in': set([url]), 'count': next(counter)}
+                pq[out_link] = (1, next(counter) * -1, set([url]))
 
     # update in-links to ES
     for url in crawled:
@@ -177,6 +184,3 @@ if __name__ == '__main__':
     end_time = time.time()
     print "Time elapsed: %d mins %d secs" % ((end_time - start_time) / 60, (end_time-start_time) % 60)
 
-
-# if __name__ == '__main__':
-    inspect('http://en.wikipedia.org/wiki/Metahuman')

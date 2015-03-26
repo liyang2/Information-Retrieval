@@ -2,7 +2,7 @@
 from elasticsearch import Elasticsearch
 import uuid
 
-index_name = 'hw4'
+index_name = 'hw5'
 doc_type = 'page'
 
 uuid_to_url = {}
