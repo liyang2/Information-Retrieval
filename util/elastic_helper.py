@@ -1,8 +1,9 @@
 # encoding=utf-8
 from elasticsearch import Elasticsearch
+from elasticsearch import helpers
 import uuid
 
-index_name = 'hw5'
+index_name = 'hw3'
 doc_type = 'page'
 
 uuid_to_url = {}
@@ -73,6 +74,7 @@ def init_index():
         }
     )
 
+
 def unicode_to_bytes(str):
     return str.encode('utf-8', 'ignore')
 
@@ -119,17 +121,14 @@ def es_update_inlinks(url, in_links):
 
 # returned fields: url, header, in-links, out-links
 # 'text' and 'html' are skipped because too big
-def get_all(size):
+def get_all():
     es = Elasticsearch(timeout=100)
-    results = es.search(
-        index=index_name, doc_type=doc_type, size=size, body={
-            "query": {
-                "match_all": {}
-            },
-            "fields": ["url", "header", "in-links", "out-links"]
-        }
-    )
-    return results['hits']['hits']
+
+    ret = helpers.scan(es,
+                       index=index_name,
+                       doc_type=doc_type,
+                       scroll='5m')
+    return ret
 
 
 def get_single(doc_id):
@@ -137,5 +136,7 @@ def get_single(doc_id):
     ret = es.get(index=index_name, doc_type=doc_type, id=doc_id)
     return ret
 
+
 if __name__ == '__main__':
-    init_index()
+    x = get_all()
+    print next(x)

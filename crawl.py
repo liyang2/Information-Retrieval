@@ -1,8 +1,22 @@
-from collections import defaultdict
+"""
+This is a small scale web crawler designed to crawl 12000 web pages
+related to subject: big box movies
+
+Here is some techniques used when designing:
+1. Use priority queue for frontier management, 'heapq' in python's standard
+ library doesn't support modifying element's priority so I switched to use
+ a 3rd party library named 'PQDict'
+
+2. Obey the politeness rule, crawling the same domain within 1s is not allowed,
+ but to improve efficiency I keep popping the queue until I found some other url
+ whose last visit time is before 1s ago.
+
+3. Deal with unicode issue
+
+"""
 import itertools
 import time
 from bs4 import BeautifulSoup
-import urllib
 import re
 from pqdict import PQDict
 
@@ -136,7 +150,6 @@ def start_crawl():
             pq[url_t] = value_t
 
         in_links_to_url = value[2]
-
         try:
             headers, html, clean, out = inspect(url)
 
