@@ -4,6 +4,6 @@ test.py
 .DS_Store
 *.pyc
 index/*
-util/secret.txt
+util/*.txt
 results/
 results2/
