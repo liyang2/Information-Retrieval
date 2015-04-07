@@ -39,21 +39,23 @@ def start_dump():
 
     f = open('crawled.txt', 'w')
     f2 = open('link_graph.txt', 'w')
+    f3 = open('inlinks.txt', 'w')
 
     for item in all_docs:
         url = item['_id']
         header = item['_source']['header']
-        # ins = item['fields']['in-links']  # in links are not dumped
+        ins = item['fields']['in-links']
         outs = item['_source']['out-links']
         text = item['_source']['text']
         html = item['_source']['html']
 
         print "dumping", url
         dump_link_graph(f2, url, outs)
+        dump_link_graph(f3, url, ins)
         dump_to_file(f, url, None, header, text, html)
     f.close()
     f2.close()
-
+    f3.close()
 
 if __name__ == '__main__':
     start_dump()

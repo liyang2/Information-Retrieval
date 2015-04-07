@@ -38,31 +38,6 @@ seed_urls = ['http://en.wikipedia.org/wiki/List_of_highest-grossing_films',
 counter = itertools.count()
 
 
-def next_best(queue, last):
-    if not queue:
-        raise KeyError('Queue is empty')
-
-    if last and not http.whether_need_wait(last):
-        last = None
-
-    queue_iter = queue.iterkeys()
-    ret = queue_iter.next()
-    while last and http.domain(last) == http.domain(ret):
-        ret = queue_iter.next()
-
-    for url in queue:
-        if url in seed_urls:
-            return url
-        if last and http.domain(url) == http.domain(last):
-            continue
-        in_links = len(queue[url]['in'])
-        time_stayed = queue[url]['count']
-        if in_links > len(queue[ret]['in']) or (in_links == len(queue[ret]['in'])
-                                                and time_stayed < queue[ret]['count']):
-            ret = url
-    return ret
-
-
 def visible(element):
     if element.parent.name in ['style', 'script', '[document]', 'head', 'title']:
         return False
@@ -189,11 +164,9 @@ def start_crawl():
         elastic_helper.es_update_inlinks(url, crawled[url])
 
 
-
 if __name__ == '__main__':
     elastic_helper.init_index()
     start_time = time.time()
     start_crawl()
     end_time = time.time()
     print "Time elapsed: %d mins %d secs" % ((end_time - start_time) / 60, (end_time-start_time) % 60)
-
