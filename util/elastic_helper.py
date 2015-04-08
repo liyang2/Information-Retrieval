@@ -7,6 +7,7 @@ index_name = 'hw3'
 doc_type = 'page'
 
 uuid_to_url = {}
+# argument url should be in unicode
 def url_to_uuid(url):
     uuid_str = str(uuid.uuid5(uuid.NAMESPACE_URL, url.encode('utf-8')))
     uuid_to_url[uuid_str] = url
@@ -136,6 +137,20 @@ def get_single(doc_id):
     ret = es.get(index=index_name, doc_type=doc_type, id=doc_id)
     return ret
 
+# argument fields is a list
+def search(index, size, query, fields):
+    es = Elasticsearch()
+    results = es.search(
+            index=index, doc_type='document', size=size, body={
+                "query": {
+                    "match": {
+                        "text": query
+                    }
+                },
+                'fields': fields
+            }
+        )
+    return results['hits']['hits']
 
 if __name__ == '__main__':
     x = get_all()
