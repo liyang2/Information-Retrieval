@@ -4,7 +4,7 @@ from elasticsearch import helpers
 import uuid
 
 index_name = 'hw3'
-doc_type = 'page'
+doc_type = 'document'
 
 uuid_to_url = {}
 # argument url should be in unicode

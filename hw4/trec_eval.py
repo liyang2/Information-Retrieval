@@ -12,6 +12,11 @@ class TrecEvalResult:
         self.recl = {}  # recall value after k docs retrieved
         self.f1 = {}  # f1 value after k docs retrieved
 
+        for k in [5, 10, 20, 50, 100]:
+            self.prec[k] = 0
+            self.recl[k] = 0
+            self.f1[k] = 0
+
         self.r_prec = 0
         self.avg_prec = 0
         self.nDCG = 0
@@ -109,9 +114,8 @@ def main(argv):
 
 
 
-    # print result
-    for query_id, obj in trec_eval_dict.iteritems():
-        print "Query id: {}".format(query_id), obj.total_rel_c
+    def print_single_result(obj):
+        print "Query id: {}".format(obj.query_id)
         print "{0:3s}  {1:6s}  {2:6s}  {3:6s}".format("k", "prec", "recl", "f1")
         for k in [5, 10, 20, 50, 100]:
             print "{0:3d}  {1:.4f}  {2:.4f}  {3:.4f}".format(k, obj.prec[k], obj.recl[k], obj.f1[k])
@@ -119,6 +123,32 @@ def main(argv):
         print "Average precision: {:.4f}".format(obj.avg_prec)
         print "nDCG: {:.4f}".format(obj.nDCG)
         print ""
+
+    # print result
+    if with_dash_q:
+        for obj in sorted(trec_eval_dict.itervalues(), key=lambda x: x.query_id):
+            print_single_result(obj)
+
+    sum_obj = TrecEvalResult(-1)
+    for obj in trec_eval_dict.itervalues():
+        for k in [5, 10, 20, 50, 100]:
+            sum_obj.prec[k] += obj.prec[k]
+            sum_obj.recl[k] += obj.recl[k]
+            sum_obj.f1[k] += obj.f1[k]
+        sum_obj.r_prec += obj.r_prec
+        sum_obj.avg_prec += obj.avg_prec
+        sum_obj.nDCG += obj.nDCG
+
+    for k in [5, 10, 20, 50, 100]:
+        sum_obj.prec[k] /= len(trec_eval_dict)
+        sum_obj.recl[k] /= len(trec_eval_dict)
+        sum_obj.f1[k] /= len(trec_eval_dict)
+    sum_obj.r_prec /= len(trec_eval_dict)
+    sum_obj.avg_prec /= len(trec_eval_dict)
+    sum_obj.nDCG /= len(trec_eval_dict)
+    sum_obj.query_id = len(trec_eval_dict)
+    print_single_result(sum_obj)
+
 
 
 if __name__ == '__main__':

@@ -44,7 +44,7 @@ def start_dump():
     for item in all_docs:
         url = item['_id']
         header = item['_source']['header']
-        ins = item['fields']['in-links']
+        ins = item['_source']['in-links']
         outs = item['_source']['out-links']
         text = item['_source']['text']
         html = item['_source']['html']
