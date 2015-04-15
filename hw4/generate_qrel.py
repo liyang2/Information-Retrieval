@@ -15,6 +15,21 @@ def tranform():
             qrel_f.write(query_id + " " + assessor + " " + uuid + " " + str(grade) + "\n")
     qrel_f.close()
 
+# Input:
+# QREL file: [Query_id] [Assessor] [URL] [Grade]
+
+# Output:
+# QREL file: [Query_id] Team [URL] [Grade]
+def transform2():
+    f2 = open("qrel_all.txt", 'w')
+    with open("qrel_all_.txt") as f:
+        for line in f:
+            parts = line.split()
+            f2.write(parts[0] + " Team " + parts[2] + " " + parts[3] + "\n")
+    f2.close()
+
+
+
 
 # Input: query.txt
 # Output: Results file: [Query_id] Q0 [UUID] [Rank] [Score] Exp
@@ -30,5 +45,7 @@ def generate_ES_result():
                     str(doc_item['_score']) + " Exp" + "\n")
 
 if __name__ == '__main__':
-    tranform()
-    generate_ES_result()
+    # tranform()
+    # generate_ES_result()
+
+    transform2()
